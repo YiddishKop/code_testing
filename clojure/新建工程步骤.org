@@ -1,0 +1,9 @@
+- 构建项目命令
+
+lein new app my-stuff
+
+- 项目内启动 cider 命令
+
+1. repl 进程在 emacs 中只允许存在一个
+2. 通过 cider-jack-in 命令启动
+3. 只有启动该项目的 repl 才能使用 C-c C-c 直接在 .clj 源码中运行代码并显示结果
