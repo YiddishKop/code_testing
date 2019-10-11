@@ -1,0 +1,5 @@
+ffmpeg -i videoname -vn audioname
+
+
+ffmpeg -i ～/视频/4K\ Video\ Downloader/videoname -vn ～/音乐/dictation/audioname
+
