@@ -151,17 +151,17 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(let [result expression]
-  (println result)
-  result)
+; (let [result expression]
+;   (println result)
+;   result)
 
 
 ;; 错误示范
-(defmacro my-print-whoopsie
-  [expression]
-  (list let [result expression]
-        (list println result)
-        result))
+; (defmacro my-print-whoopsie
+;   [expression]
+;   (list let [result expression]
+;         (list println result)
+;         result))
 
 
 ;; 【编程感想： 上面这个代码的三个错误】
@@ -890,7 +890,7 @@ sweating-to-the-oldies
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; map 参数类型析构专题总结 ;;
+;; map 参数类型析构专题总结   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; map析构对下面集中数据结构有效：
@@ -986,8 +986,201 @@ sweating-to-the-oldies
 
 
 
-(defn -main
-  "I don't do a whole lot ... yet."
-  [& args]
-  (println "Hello, World!"))
 
+;;;;;;;;;;;;;;
+;; 工程实践   ;;
+;;;;;;;;;;;;;;
+
+;;;;; Brews for the Brave and True
+
+;;; validation function
+
+(def order-details
+  {:name "mitchard blimmons"
+   :email "mitchard.blimmonsgmail.com"})
+;; => #'chap8.core/order-details
+
+
+;; 我们希望有个函数可以检测用户名和邮件格式的有效性
+;; 上面的邮件格式没有 "@" 符号是有问题的
+
+;; (validate order-details order-details-validations)
+;; we hope this function can return
+;; => {:email ["Your email address doesn't look like an email address."]}
+;; 第一个是待验证 map 第二个是提供验证功能相关信息的 map （其中包含了错误提示信息及检测函数）
+;;                                           ^
+;;                                           |
+;; -------------------------------------------------------------------
+
+;; 请注意这种组织函数与信息的方式： 将相关变量(order-details 中的 :name 可以看成
+;; 变量)及其值(order-details 中的 "mitchard blimmons" 可以看成变量值)组织成 map
+;; （map这里特别类似 oop 中 '对象' 的感觉）。然后把对该‘对象’的处理信息（包括
+;; 处理函数及其需要的其他信息）也组织成 map (<- order-details-validations) 其中
+;; 存放对应的变量及对其的处理方式（这tm简直就是 oop）。
+
+
+(def order-details-validations
+  {:name
+   ;; ---
+   ;; 1. 被验证标签名
+   ["please enter a name"
+    ;; 2. 验证函数返回 nil 时的提示信息
+    not-empty
+    ;; 3. 验证函数，返回 nil 或者 true
+    ]
+
+   :email
+   ["please enter en email address"
+    not-empty
+    "Your email address doesn't look like an email address"
+    #(or (empty? %) (re-seq #"@" %))
+    ;; 这里通过(拆分保留<--reseq)来拆分字符串中的 "@" 符号，无则返回 nil。
+    ;; 通过 or 来实现“多个条件都不允许”。
+    ]})
+
+
+
+
+;; 'validate' 函数可以被拆解为 2 个函数
+(defn error-messages-for
+  "return a seq of error message
+
+  把 order-detials-validations 中的每个键（:name 和 :email）的值分割成2元素
+  组( ['please enter a name' not-empty])。调用2元素组的第二个元素（验证函数）验
+  证 order-details 中对应键(:name 和 :email)的值是否合法。以不合法作为保留条件
+  filter 左右的2元素组，并用 map 取出所有不合法2元素组的第一个元素，也就是错误格
+  式提示信息。
+
+  "
+  [to-validate message-validator-pairs]
+  (map first (filter #(not ((second %) to-validate))
+                     (partition 2 message-validator-pairs)
+                     ;; 因为每一个键(:name,:email)可以对应不同的验证函数和提示信息
+                     ;; 这里 message-vlidator-pairs 就是把每个键的多组函数及提示信息
+                     ;; 组织成二元素组(函数，提示信息), 并根据函数进行过滤，并根据map提取提
+                     ;; 示信息, 也就是最后提取的信息应该是一个数组。
+                     )))
+
+;; 【编程感想】
+;; 通过上面这两个函数可以感觉到：
+; clojure 是尽量把你要处理的所有事情都【转成一个map】，然后就进入
+; 函数式编程的节奏里来了。
+
+
+;; 【编程感想：新函数 partition】
+
+;; (partition group-size step padding-coll target-coll)
+;; (partition n n coll coll)
+;; "n" : 每组有几个元素
+;; "n" : 分组之间间隔几个元素
+;; "coll" ：如果出现不够分的情况使用本集合元素按顺序补充
+;; "coll" : 目标待分割集合
+
+; (partition 3 1 (range 1 10))
+; ((1 2 3) (2 3 4) (3 4 5) (4 5 6) (5 6 7) (6 7 8) (7 8 9))
+; 1 2 3 4 5 6 7 8 9 10
+; 1 2 3
+;   2 3 4
+;     4 5 6
+
+
+; (partition 3 2 (range 1 10))
+; => ((1 2 3) (3 4 5) (5 6 7) (7 8 9))
+; 1 2 3 4 5 6 7 8 9 10
+; 1 2 3
+;     3 4 5
+;         5 6 7
+
+; (partition 3 3 (range 1 10))
+; => ((1 2 3) (4 5 6) (7 8 9))
+; 1 2 3 4 5 6 7 8 9 10
+; 1 2 3
+;       4 5 6
+;             7 8 9
+
+; (partition 6 3 ["a" "b" "c"] (range 1 10))
+; => ((1 2 3 4 5 6) (4 5 6 7 8 9) (7 8 9 "a" "b" "c"))
+; 1 2 3 4 5 6 7 8 9 10
+; 1 2 3 4 5 6
+;       4 5 6 7 8 9
+;             7 8 9 | "a" "b" "c"
+
+(error-messages-for "" ["Please enter a name" not-empty])
+;; => ("Please enter a name")
+
+
+(defn validate
+  "returna a map with a vector of errors for each key"
+  [to-validate validations]
+  (reduce (fn [errors validation]
+            (let [[fieldname validation-check-groups] validation
+                  value (get to-validate fieldname)
+                  error-messages (error-messages-for
+                                  value
+                                  validation-check-groups)]
+              (if (empty? error-messages)
+                errors
+                (assoc errors fieldname error-messages))))
+          {}
+          validations))
+
+(validate order-details order-details-validations)
+;; => {:email ("Your email address doesn't look like an email address")}
+
+
+
+;;;;;;;;;;;;;;
+;; if-valid ;;
+;;;;;;;;;;;;;;
+
+;; 现在刚才实现的函数，遇到一个具体问题，也许我们会这么做：
+
+(let [errors (validate order-details order-details-validations)]
+  (if (empty? errors)
+    (println :success)
+    (println :failure errors)))
+
+;; 我们实际是在做如下几件事情：
+;; 1. 对 record 使用 validate 函数并将错误信息绑定到（没有则绑定nil） errors
+;; 2. 检测 errors 中是否存有错误信息字符串
+;; 3. 如果没有则打印出 :success
+;; 4. 如果有则打印出所有错误信息 :failure + 错误信息
+
+;; validate -> errors -> empty or not? -> display.
+
+;; 这个逻辑coder并不陌生，我们经常不断的重复这几个步骤，如果想对此加以抽象的话，也许
+;; 我们会这么做：
+
+(defn if-valid
+  [record validations success-code failure-code]
+  (let [errors (validate record validations)]
+    (if (empty? errors)
+      success-code
+      failure-code)))
+
+;; 但是这么做， success-code failure-code 在传递进函数时就会被计算，也就是
+;; 我们没法做到 display 这一步。
+
+(if-valid order-details order-details-validations
+          (println :success)
+          (println :failure))
+
+;; (println :success) 和 (println :failure) 作为 if-valid 入参会首先发生
+;; 计算, 这时就会打印出两者的信息，并将 nil 赋值给 success-code 和 failure-code
+;; 接下来无论 errors 中是否有值，都不会再打印任何信息了。
+
+;; 所以这里我们需要的是，【让传入的代码延迟运行】，为了达到这一步只能通过宏，因为【宏可以
+;; 控制代码何时运行】:
+
+(defmacro if-valid
+  "Handle validation more concisely"
+  [to-validate validations errors-name & then-else]
+  `(let [~errors-name (validate ~to-validate ~validations)]
+     (if (empty? ~errors-name)
+       ~@then-else)))
+
+(if-valid order-details order-details-validations errors
+          (println :success)
+          (println :failure errors))
+
+;; 更进一步，我们的 display 部分希望访问之前三个步骤( validate, errors, empty? )产生的一些值，而不单单是直接打印 success 或者 failure. 这个如果使用函数是更不可能实现的 --- 一个外部的函数【希望延迟运行】且【能访问到外层函数的一些中间结果】.
